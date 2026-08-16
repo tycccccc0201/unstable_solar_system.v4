@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Solar Chaos Lab｜不穩定太陽系模擬器</title>
+<style>
+  :root{
+    --bg:#05070d; --panel:#0b1020; --panel2:#11182b; --line:#24304b; --text:#edf3ff;
+    --muted:#9aa8c7; --accent:#79b8ff; --good:#78e0a8; --warn:#ffd166; --bad:#ff6b7a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+  body{display:grid;grid-template-columns:minmax(0,1fr) 350px}
+  #stage{position:relative;min-width:0;background:radial-gradient(circle at 50% 45%,#0c1426 0,#070b14 40%,#03050a 100%)}
+  canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  canvas:active{cursor:grabbing}
+  .hud{position:absolute;left:14px;top:14px;display:flex;gap:8px;flex-wrap:wrap;max-width:70%}
+  .pill{background:rgba(8,13,24,.78);border:1px solid rgba(140,170,230,.2);backdrop-filter:blur(10px);padding:7px 10px;border-radius:999px;font-size:12px;color:#dbe8ff}
+  .pill b{font-weight:650}
+  #legend{position:absolute;left:14px;bottom:14px;font-size:12px;color:#b9c4dc;background:rgba(5,8,15,.72);border:1px solid rgba(140,170,230,.16);padding:9px 11px;border-radius:12px;backdrop-filter:blur(8px)}
+  #tooltip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(8,12,22,.94);border:1px solid #33415e;padding:8px 10px;border-radius:10px;font-size:12px;color:white;min-width:130px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+  aside{background:linear-gradient(180deg,#0c1221,#080c16);border-left:1px solid #1d2740;height:100%;overflow:auto;padding:14px}
+  h1{font-size:20px;margin:0 0 3px;font-weight:700;letter-spacing:.2px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+  .section{border-top:1px solid #1c2740;padding-top:12px;margin-top:12px}
+  .section h2{font-size:13px;margin:0 0 9px;color:#c8d7f5;text-transform:uppercase;letter-spacing:.08em}
+  .row{display:flex;gap:8px;align-items:center;margin:7px 0}
+  .row>*{min-width:0}
+  button,select,input[type=number]{font:inherit;color:var(--text);background:#121a2c;border:1px solid #2a3858;border-radius:10px;padding:8px 9px}
+  button{cursor:pointer;transition:.15s transform,.15s border-color,.15s background}
+  button:hover{border-color:#4e6799;background:#17223a}
+  button:active{transform:translateY(1px)}
+  button.primary{background:#1a3e67;border-color:#2f6fae}
+  button.danger{border-color:#613544;color:#ffdce1}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  label{font-size:12px;color:#c3cde0}
+  .control{margin:10px 0}
+  .control .top{display:flex;justify-content:space-between;gap:10px;margin-bottom:5px;align-items:center}
+  .control .top .rhs{display:flex;align-items:center;gap:6px}
+  .reset1{padding:3px 7px;border-radius:7px;font-size:10px;color:#cfe0ff;background:#0d1628;border-color:#314565;white-space:nowrap}
+  .value{color:#fff;font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:#6ea8ff}
+  .planet-list{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .toggle{display:flex;align-items:center;gap:7px;background:#0e1525;border:1px solid #202d48;padding:7px 8px;border-radius:10px;font-size:12px;user-select:none}
+  .toggle input{accent-color:#6ea8ff}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 8px currentColor}
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .ecc-wrap{margin-top:8px;background:#0d1424;border:1px solid #202c46;border-radius:11px;padding:8px}
+  .ecc-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:6px}
+  .ecc-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .ecc-now{font-size:13px;color:#fff;font-variant-numeric:tabular-nums}
+  #eccChart{display:block;width:100%;height:84px;border-radius:7px;background:rgba(255,255,255,.018)}
+  .metric{background:#0d1424;border:1px solid #202c46;border-radius:11px;padding:8px}
+  .metric .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .metric .v{font-size:15px;margin-top:3px;font-variant-numeric:tabular-nums}
+  .note{font-size:11px;line-height:1.55;color:#92a2c2;background:#0a1020;border:1px solid #1f2a44;padding:9px;border-radius:10px}
+  .status-good{color:var(--good)} .status-warn{color:var(--warn)} .status-bad{color:var(--bad)}
+  details{font-size:12px;color:#aebbd4} details summary{cursor:pointer;color:#d5e1f7}
+  .mini{font-size:11px;color:#8fa0bf}
+  .kbd{border:1px solid #3b4966;border-bottom-width:2px;border-radius:5px;padding:1px 5px;background:#111a2b;color:#dbe7ff}
+  @media(max-width:900px){body{grid-template-columns:1fr;grid-template-rows:minmax(52vh,1fr) 48vh}aside{border-left:0;border-top:1px solid #1d2740}.hud{max-width:95%}}
+</style>
+</head>
+<body>
+<section id="stage">
+  <canvas id="space"></canvas>
+  <div class="hud">
+    <div class="pill">模擬時間 <b id="timeHud">0.00 年</b></div>
+    <div class="pill">狀態 <b id="stabilityHud" class="status-good">穩定</b></div>
+    <div class="pill">能量漂移 <b id="energyHud">0.000%</b></div>
+  </div>
+  <div id="tooltip"></div>
+  <div id="legend">拖曳旋轉視角 · 滾輪縮放 · 點星球選取 · <span class="kbd">Space</span> 播放/暫停</div>
+</section>
+
+<aside>
+  <h1>Solar Chaos Lab</h1>
+  <div class="sub">太陽系長期混沌 N-body 模擬器｜物理計算採真實質量與 AU；畫面壓縮軌道間距並放大星體，方便觀察。真實太陽系短期穩定，但在長時間尺度具有混沌性。</div>
+
+  <div class="grid2">
+    <button id="playBtn" class="primary">▶ 播放</button>
+    <button id="resetBtn">↺ 重設</button>
+  </div>
+
+  <div class="section">
+    <h2>真實模式與參數實驗</h2>
+    <div class="grid2">
+      <button data-preset="real">真實太陽系</button>
+      <button data-preset="jupiter10">木星 ×10</button>
+      <button data-preset="jupiter30">木星 ×30</button>
+      <button data-preset="earthKick">地球加速</button>
+    </div>
+    <div class="row"><button id="chaosBtn" class="primary" style="width:100%">◎ 真實太陽系｜長期混沌演化</button></div>
+    <div class="mini">上方「木星 ×10／×30、地球加速」保留作人為對照實驗；真正的長期混沌按鈕不會修改任何物理倍率。</div>
+  </div>
+
+  <div class="section">
+    <h2>星體開關</h2>
+    <div class="planet-list" id="planetList"></div>
+    <div class="row"><button id="restoreAll" style="width:100%">全部恢復</button></div>
+  </div>
+
+  <div class="section">
+    <h2>選定星球參數</h2>
+    <div class="row">
+      <label for="planetSelect" style="width:72px">星球</label>
+      <select id="planetSelect" style="flex:1"></select>
+    </div>
+    <div class="control">
+      <div class="top"><label>質量倍率</label><span class="rhs"><span class="value" id="massVal">1.00×</span><button class="reset1" data-reset1="massScale">↺ 1.0×</button></span></div>
+      <input id="massScale" type="range" min="0.05" max="50" step="0.05" value="1">
+    </div>
+    <div class="control">
+      <div class="top"><label>初始速度倍率</label><span class="rhs"><span class="value" id="velVal">1.000×</span><button class="reset1" data-reset1="velScale">↺ 1.0×</button></span></div>
+      <input id="velScale" type="range" min="0.55" max="1.45" step="0.001" value="1">
+    </div>
+    <div class="control">
+      <div class="top"><label>初始距離倍率</label><span class="rhs"><span class="value" id="distVal">1.000×</span><button class="reset1" data-reset1="distScale">↺ 1.0×</button></span></div>
+      <input id="distScale" type="range" min="0.65" max="1.35" step="0.001" value="1">
+    </div>
+    <div class="mini">修改以上參數後按「套用並重啟」；這能乾淨比較不同初始條件。</div>
+    <div class="row"><button id="applyPlanet" class="primary" style="width:100%">套用並重啟</button></div>
+  </div>
+
+  <div class="section">
+    <h2>模擬控制</h2>
+    <div class="control">
+      <div class="top"><label>運行速度</label><span class="value" id="speedVal">0.25 日/畫面</span></div>
+      <input id="speed" type="range" min="0.02" max="15" step="0.01" value="0.25">
+    </div>
+    <div class="control">
+      <div class="top"><label>積分步長 Δt</label><span class="value" id="dtVal">0.05 日</span></div>
+      <input id="dt" type="range" min="0.01" max="1" step="0.01" value="0.05">
+    </div>
+    <div class="control">
+      <div class="top"><label>重力倍率 G</label><span class="rhs"><span class="value" id="gVal">1.000×</span><button class="reset1" data-reset1="gScale">↺ 1.0×</button></span></div>
+      <input id="gScale" type="range" min="0.5" max="2" step="0.005" value="1">
+    </div>
+    <div class="row"><label><input id="grCorrection" type="checkbox" checked> 太陽一階廣義相對論修正（1PN）</label></div>
+    <div class="note">Δt 越小越準，但跑得較慢。若把 Δt 拉太大，數值誤差本身也會製造「假混沌」，所以網站會同步顯示總能量漂移。真實太陽系的混沌通常要在非常長的時間尺度才會明顯，不會像人為放大木星質量那樣立刻散架。</div>
+  </div>
+
+  <div class="section">
+    <h2>畫面</h2>
+    <div class="control">
+      <div class="top"><label>畫面縮放</label><span class="value" id="zoomVal">58×</span></div>
+      <input id="zoom" type="range" min="25" max="110" step="1" value="58">
+    </div>
+    <div class="control">
+      <div class="top"><label>軌道間距壓縮</label><span class="value" id="spacingVal">0.55</span></div>
+      <input id="spacing" type="range" min="0.40" max="0.85" step="0.01" value="0.55">
+      <div class="mini">越靠左越緊湊；只影響畫面，不改變實際重力計算。</div>
+    </div>
+    <div class="control">
+      <div class="top"><label>視角傾斜</label><span class="value" id="tiltVal">20°</span></div>
+      <input id="tilt" type="range" min="0" max="75" step="1" value="20">
+    </div>
+    <div class="row"><label><input id="orbits" type="checkbox" checked> 顯示瞬時軌道</label><label><input id="trails" type="checkbox" checked> 顯示軌跡</label></div>
+    <div class="row"><label><input id="labels" type="checkbox" checked> 顯示名稱</label></div>
+    <div class="mini">淡白色實線是依「當下位置＋速度」算出的瞬時軌道；受其他行星擾動後，離心率、半長軸與軌道方向都會隨時間改變。</div>
+  </div>
+
+  <div class="section">
+    <h2>即時診斷</h2>
+    <div class="metrics">
+      <div class="metric"><div class="k">最近行星距離</div><div class="v" id="minSep">—</div></div>
+      <div class="metric"><div class="k">最快星球</div><div class="v" id="fastest">—</div></div>
+      <div class="metric"><div class="k">啟用天體</div><div class="v" id="activeCount">9</div></div>
+      <div class="metric"><div class="k">遭遇事件</div><div class="v" id="eventCount">0</div></div>
+      <div class="metric"><div class="k">選定星球離心率 e</div><div class="v" id="eccNow">—</div></div>
+      <div class="metric"><div class="k">離心率變化 Δe</div><div class="v" id="eccDelta">—</div></div>
+    </div>
+    <div class="ecc-wrap">
+      <div class="ecc-head"><span class="ecc-title">離心率隨時間</span><span class="ecc-now" id="eccPlanetName">地球</span></div>
+      <canvas id="eccChart"></canvas>
+    </div>
+  </div>
+
+  <div class="section">
+    <details>
+      <summary>這個模型的物理假設</summary>
+      <p>採 Newton 萬有引力、多體互相作用、三維位置與速度，以及 velocity-Verlet / leapfrog 類型的辛積分。太陽也會被行星拉動，不是硬釘在原點。「真實太陽系｜長期混沌演化」不會修改任何星球的質量、距離或速度倍率；所有倍率都維持 1.0×。</p>
+      <p>初始軌道元素採 JPL J2000 近似資料；質量以 JPL DE440 的 GM 比值換算。預設加入太陽的一階廣義相對論（1PN）近似修正；仍未加入潮汐、太陽質量流失、衛星、非球形重力與小天體，因此適合教學與混沌實驗，不應當作精密星曆。</p>
+      <p>星球畫面半徑與軌道顯示都經過視覺化處理；物理運算仍使用真實 AU 距離。軌道壓縮只負責讓畫面更好讀。太陽系的「混沌」是對初始條件敏感的長期動力學性質，不代表八大行星會在幾年或幾百年內明顯散架。</p>
+      <p>淡白色實線顯示的是各行星相對太陽的 osculating orbit（瞬時密切軌道）。它由當下的位置與速度換算而來，因此在多體擾動下，離心率、半長軸與軌道方向都可以隨時間改變。</p>
+    </details>
+  </div>
+</aside>
+
+<script>
+(() => {
+'use strict';
+const canvas = document.getElementById('space');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+const eccCanvas = document.getElementById('eccChart');
+const eccCtx = eccCanvas.getContext('2d');
+const G0 = 4 * Math.PI * Math.PI; // AU^3 / (solar mass * yr^2)
+const DAY = 1/365.25;
+const C_AUYR = 299792.458 / 4.740470463; // speed of light in AU/yr
+const SUN_GM = 1.32712440041279419e11; // km^3 s^-2
+
+const raw = [
+  {name:'太陽', en:'Sun', gm:SUN_GM, a:0,e:0,i:0,L:0,varpi:0,node:0, vr:16, color:'#F6C85F'},
+  {name:'水星', en:'Mercury', gm:22031.868551, a:0.38709927,e:0.20563593,i:7.00497902,L:252.25032350,varpi:77.45779628,node:48.33076593,vr:4.3,color:'#B7B8BA'},
+  {name:'金星', en:'Venus', gm:324858.592000, a:0.72333566,e:0.00677672,i:3.39467605,L:181.97909950,varpi:131.60246718,node:76.67984255,vr:5.7,color:'#D8B06F'},
+  {name:'地球', en:'Earth', gm:398600.435507+4902.800118, a:1.00000261,e:0.01671123,i:-0.00001531,L:100.46457166,varpi:102.93768193,node:0,vr:5.9,color:'#6FA8DC'},
+  {name:'火星', en:'Mars', gm:42828.375816, a:1.52371034,e:0.09339410,i:1.84969142,L:-4.55343205,varpi:-23.94362959,node:49.55953891,vr:4.8,color:'#D9795D'},
+  {name:'木星', en:'Jupiter', gm:126712764.1, a:5.20288700,e:0.04838624,i:1.30439695,L:34.39644051,varpi:14.72847983,node:100.47390909,vr:10.3,color:'#C7A27F'},
+  {name:'土星', en:'Saturn', gm:37940584.8418, a:9.53667594,e:0.05386179,i:2.48599187,L:49.95424423,varpi:92.59887831,node:113.66242448,vr:9.3,color:'#D8C987'},
+  {name:'天王星', en:'Uranus', gm:5794556.4, a:19.18916464,e:0.04725744,i:0.77263783,L:313.23810451,varpi:170.95427630,node:74.01692503,vr:7.3,color:'#86C7CC'},
+  {name:'海王星', en:'Neptune', gm:6836527.10058, a:30.06992276,e:0.00859048,i:1.77004347,L:-55.12002969,varpi:44.96476227,node:131.78422574,vr:7.1,color:'#6689D3'}
+];
+
+const config = raw.map((p,idx)=>({enabled:true,massScale:1,velScale:1,distScale:1,index:idx}));
+let bodies=[];
+let running=false;
+let simTime=0;
+let initialEnergy=0;
+let eventCount=0;
+let lastEncounterKey='';
+let selected=3;
+let trails = new Map();
+let eccHistory = new Map();
+let initialEcc = new Map();
+let lastEccRecordTime = -Infinity;
+let frame=0;
+let camera={rot:-0.22, tilt:20*Math.PI/180, zoom:58, spacing:.55};
+let drag={on:false,x:0,y:0};
+let projected=[];
+let stars=[];
+
+function deg(x){return x*Math.PI/180}
+function dot(a,b){return a.x*b.x+a.y*b.y+a.z*b.z}
+function cross(a,b){return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x}}
+function norm(a){return Math.hypot(a.x,a.y,a.z)}
+function unit(a){const n=norm(a);return n>1e-14?{x:a.x/n,y:a.y/n,z:a.z/n}:{x:0,y:0,z:0}}
+function osculatingElements(b){
+  if(b.idx===0) return null;
+  const sun=bodies.find(x=>x.idx===0); if(!sun) return null;
+  const r={x:b.x-sun.x,y:b.y-sun.y,z:b.z-sun.z};
+  const v={x:b.vx-sun.vx,y:b.vy-sun.vy,z:b.vz-sun.vz};
+  const rmag=norm(r), v2=dot(v,v); if(rmag<1e-12) return null;
+  const mu=G0*Number(document.getElementById('gScale').value)*(sun.mass+b.mass);
+  const h=cross(r,v), hmag=norm(h); if(hmag<1e-12 || mu<=0) return null;
+  const vxh=cross(v,h);
+  const evec={x:vxh.x/mu-r.x/rmag,y:vxh.y/mu-r.y/rmag,z:vxh.z/mu-r.z/rmag};
+  const e=norm(evec), energy=.5*v2-mu/rmag;
+  const a=energy<0?-mu/(2*energy):Infinity;
+  const p=hmag*hmag/mu;
+  let ehat=e>1e-7?unit(evec):unit(r);
+  const hhat=unit(h);
+  let qhat=unit(cross(hhat,ehat));
+  if(norm(qhat)<1e-12){
+    const fallback=Math.abs(hhat.z)<.9?{x:0,y:0,z:1}:{x:1,y:0,z:0};
+    ehat=unit(cross(fallback,hhat)); qhat=unit(cross(hhat,ehat));
+  }
+  return {e,a,p,energy,ehat,qhat,hhat};
+}
+function solveKepler(M,e){
+  M=((M+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+  let E=M;
+  for(let k=0;k<12;k++){ const f=E-e*Math.sin(E)-M; E-=f/(1-e*Math.cos(E)); }
+  return E;
+}
+function rotateOrbital(xp,yp,omega,I,Omega){
+  const co=Math.cos(omega), so=Math.sin(omega), cO=Math.cos(Omega), sO=Math.sin(Omega), cI=Math.cos(I), sI=Math.sin(I);
+  return {
+    x:(co*cO-so*sO*cI)*xp+(-so*cO-co*sO*cI)*yp,
+    y:(co*sO+so*cO*cI)*xp+(-so*sO+co*cO*cI)*yp,
+    z:(so*sI)*xp+(co*sI)*yp
+  };
+}
+function makePlanet(p,cfg){
+  const M=deg(p.L-p.varpi), E=solveKepler(M,p.e), omega=deg(p.varpi-p.node), I=deg(p.i), Omega=deg(p.node);
+  const xp=p.a*(Math.cos(E)-p.e), yp=p.a*Math.sqrt(1-p.e*p.e)*Math.sin(E);
+  const n=Math.sqrt(G0/(p.a*p.a*p.a));
+  const dEdt=n/(1-p.e*Math.cos(E));
+  const vxp=-p.a*Math.sin(E)*dEdt, vyp=p.a*Math.sqrt(1-p.e*p.e)*Math.cos(E)*dEdt;
+  const r=rotateOrbital(xp,yp,omega,I,Omega), v=rotateOrbital(vxp,vyp,omega,I,Omega);
+  return {name:p.name,en:p.en,mass:(p.gm/SUN_GM)*cfg.massScale,baseMass:p.gm/SUN_GM,
+    x:r.x*cfg.distScale,y:r.y*cfg.distScale,z:r.z*cfg.distScale,
+    vx:v.x*cfg.velScale,vy:v.y*cfg.velScale,vz:v.z*cfg.velScale,
+    vr:p.vr,color:p.color,alive:true,idx:cfg.index};
+}
+function buildSystem(){
+  bodies=[]; trails.clear(); eccHistory.clear(); initialEcc.clear(); lastEccRecordTime=-Infinity; simTime=0;eventCount=0;lastEncounterKey='';
+  const sunCfg=config[0];
+  if(sunCfg.enabled) bodies.push({name:'太陽',en:'Sun',mass:1*sunCfg.massScale,baseMass:1,x:0,y:0,z:0,vx:0,vy:0,vz:0,vr:20,color:raw[0].color,alive:true,idx:0});
+  for(let i=1;i<raw.length;i++) if(config[i].enabled) bodies.push(makePlanet(raw[i],config[i]));
+  // Shift to barycentric frame while preserving all enabled bodies.
+  let M=0,cx=0,cy=0,cz=0,cvx=0,cvy=0,cvz=0;
+  for(const b of bodies){M+=b.mass;cx+=b.mass*b.x;cy+=b.mass*b.y;cz+=b.mass*b.z;cvx+=b.mass*b.vx;cvy+=b.mass*b.vy;cvz+=b.mass*b.vz;}
+  if(M>0){cx/=M;cy/=M;cz/=M;cvx/=M;cvy/=M;cvz/=M;for(const b of bodies){b.x-=cx;b.y-=cy;b.z-=cz;b.vx-=cvx;b.vy-=cvy;b.vz-=cvz;}}
+  for(const b of bodies) trails.set(b.idx,[]);
+  for(const b of bodies){
+    if(b.idx===0) continue;
+    const el=osculatingElements(b);
+    if(el){initialEcc.set(b.idx,el.e);eccHistory.set(b.idx,[{t:0,e:el.e}]);}
+  }
+  initialEnergy=totalEnergy();
+  updateUI(true);
+}
+
+function accelerations(){
+  const g=G0*Number(document.getElementById('gScale').value);
+  const a=bodies.map(()=>({x:0,y:0,z:0}));
+  const eps2=1e-12;
+  for(let i=0;i<bodies.length;i++) for(let j=i+1;j<bodies.length;j++){
+    const bi=bodies[i],bj=bodies[j];
+    const dx=bj.x-bi.x,dy=bj.y-bi.y,dz=bj.z-bi.z;
+    const r2=dx*dx+dy*dy+dz*dz+eps2, inv=1/Math.sqrt(r2), inv3=inv*inv*inv;
+    const fi=g*inv3;
+    a[i].x+=fi*bj.mass*dx;a[i].y+=fi*bj.mass*dy;a[i].z+=fi*bj.mass*dz;
+    a[j].x-=fi*bi.mass*dx;a[j].y-=fi*bi.mass*dy;a[j].z-=fi*bi.mass*dz;
+  }
+  // First post-Newtonian Schwarzschild correction from the Sun.
+  // This captures the dominant relativistic perihelion precession (especially Mercury)
+  // without faking any planet mass, distance or velocity.
+  if(document.getElementById('grCorrection')?.checked){
+    const si=bodies.findIndex(b=>b.idx===0);
+    if(si>=0){
+      const sun=bodies[si], mu=g*sun.mass, c2=C_AUYR*C_AUYR;
+      for(let i=0;i<bodies.length;i++){
+        if(i===si) continue;
+        const p=bodies[i];
+        const rx=p.x-sun.x, ry=p.y-sun.y, rz=p.z-sun.z;
+        const vx=p.vx-sun.vx, vy=p.vy-sun.vy, vz=p.vz-sun.vz;
+        const r2=rx*rx+ry*ry+rz*rz, r=Math.sqrt(r2);
+        if(r<1e-10) continue;
+        const v2=vx*vx+vy*vy+vz*vz, rv=rx*vx+ry*vy+rz*vz;
+        const pref=mu/(c2*r*r*r);
+        const common=4*mu/r-v2;
+        const gx=pref*(common*rx+4*rv*vx);
+        const gy=pref*(common*ry+4*rv*vy);
+        const gz=pref*(common*rz+4*rv*vz);
+        a[i].x+=gx; a[i].y+=gy; a[i].z+=gz;
+        if(sun.mass>0){
+          const q=p.mass/sun.mass;
+          a[si].x-=q*gx; a[si].y-=q*gy; a[si].z-=q*gz;
+        }
+      }
+    }
+  }
+  return a;
+}
+function step(dt){
+  let a=accelerations();
+  for(let i=0;i<bodies.length;i++){
+    const b=bodies[i];b.vx+=.5*a[i].x*dt;b.vy+=.5*a[i].y*dt;b.vz+=.5*a[i].z*dt;
+    b.x+=b.vx*dt;b.y+=b.vy*dt;b.z+=b.vz*dt;
+  }
+  a=accelerations();
+  for(let i=0;i<bodies.length;i++){
+    const b=bodies[i];b.vx+=.5*a[i].x*dt;b.vy+=.5*a[i].y*dt;b.vz+=.5*a[i].z*dt;
+  }
+  simTime+=dt;
+}
+function totalEnergy(){
+  const g=G0*Number(document.getElementById('gScale').value);
+  let ke=0,pe=0;
+  for(const b of bodies) ke+=.5*b.mass*(b.vx*b.vx+b.vy*b.vy+b.vz*b.vz);
+  for(let i=0;i<bodies.length;i++) for(let j=i+1;j<bodies.length;j++){
+    const a=bodies[i],b=bodies[j],r=Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z); pe-=g*a.mass*b.mass/Math.max(r,1e-8);
+  }
+  return ke+pe;
+}
+function diagnostics(){
+  const planets=bodies.filter(b=>b.idx!==0);
+  let min=Infinity,pair='',fast={s:0,name:'—'};
+  for(let i=0;i<planets.length;i++){
+    const p=planets[i],s=Math.hypot(p.vx,p.vy,p.vz);if(s>fast.s) fast={s,name:p.name};
+    for(let j=i+1;j<planets.length;j++){
+      const q=planets[j],d=Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z);if(d<min){min=d;pair=p.name+'–'+q.name;}
+    }
+  }
+  const sun=bodies.find(b=>b.idx===0);
+  let ejected=false,close=min<0.10, severe=min<0.03;
+  if(sun){
+    const g=G0*Number(document.getElementById('gScale').value);
+    for(const p of planets){
+      const dx=p.x-sun.x,dy=p.y-sun.y,dz=p.z-sun.z,d=Math.hypot(dx,dy,dz);
+      const dvx=p.vx-sun.vx,dvy=p.vy-sun.vy,dvz=p.vz-sun.vz;
+      const spec=.5*(dvx*dvx+dvy*dvy+dvz*dvz)-g*(sun.mass+p.mass)/Math.max(d,1e-9);
+      if(spec>0 && d>3) ejected=true;
+    }
+  }
+  const key=close?pair:'';
+  if(key && key!==lastEncounterKey){eventCount++;lastEncounterKey=key;} else if(!close) lastEncounterKey='';
+  const realMode=config.every(c=>Math.abs(c.massScale-1)<1e-12&&Math.abs(c.velScale-1)<1e-12&&Math.abs(c.distScale-1)<1e-12) && Math.abs(Number(document.getElementById('gScale').value)-1)<1e-12;
+  let status=realMode?'長期混沌｜目前穩定':'目前穩定',cls='status-good';
+  if(close){status='近距離遭遇';cls='status-warn'}
+  if(severe){status='高度不穩定';cls='status-bad'}
+  if(ejected){status='出現逸出軌道';cls='status-bad'}
+  return {min,pair,fast,status,cls};
+}
+
+function displayPosition(v){
+  // Non-linear radial mapping for display only. Physics remains in true AU.
+  const r=Math.hypot(v.x,v.y,v.z);
+  if(r<1e-12) return {x:0,y:0,z:0};
+  const rd=Math.pow(r,camera.spacing);
+  const k=rd/r;
+  return {x:v.x*k,y:v.y*k,z:v.z*k};
+}
+function project(x,y,z){
+  const c=Math.cos(camera.rot),s=Math.sin(camera.rot); const xr=c*x-s*y, yr=s*x+c*y;
+  const ct=Math.cos(camera.tilt),st=Math.sin(camera.tilt); const yp=yr*ct-z*st, depth=yr*st+z*ct;
+  return {x:canvas.width/2+xr*camera.zoom*devicePixelRatio,y:canvas.height/2+yp*camera.zoom*devicePixelRatio,d:depth};
+}
+function sunRelative(b){const sun=bodies.find(x=>x.idx===0); return sun?{x:b.x-sun.x,y:b.y-sun.y,z:b.z-sun.z}:{x:b.x,y:b.y,z:b.z};}
+function drawStars(){
+  ctx.save();for(const st of stars){ctx.globalAlpha=st.a;ctx.fillStyle='#fff';ctx.fillRect(st.x,st.y,st.s,st.s);}ctx.restore();
+}
+function drawOsculatingOrbit(b){
+  if(!document.getElementById('orbits').checked || b.idx===0) return;
+  const el=osculatingElements(b); if(!el) return;
+  // Closed instantaneous orbit for a currently bound ellipse.
+  if(!(el.e<.9995) || !(el.a>0) || !isFinite(el.a)) return;
+  const sun=bodies.find(x=>x.idx===0); if(!sun) return;
+  ctx.save();ctx.beginPath();
+  const N=220;let first=true;
+  for(let k=0;k<=N;k++){
+    const nu=2*Math.PI*k/N;
+    const rr=el.p/(1+el.e*Math.cos(nu));
+    if(!isFinite(rr) || rr>200) continue;
+    const c=Math.cos(nu),sn=Math.sin(nu);
+    const rel={x:rr*(el.ehat.x*c+el.qhat.x*sn),y:rr*(el.ehat.y*c+el.qhat.y*sn),z:rr*(el.ehat.z*c+el.qhat.z*sn)};
+    const v=displayPosition(rel),q=project(v.x,v.y,v.z);
+    if(first){ctx.moveTo(q.x,q.y);first=false}else ctx.lineTo(q.x,q.y);
+  }
+  ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(255,255,255,.30)';
+  ctx.lineWidth=.95*devicePixelRatio;ctx.stroke();ctx.restore();
+}
+function drawTrail(b){
+  if(!document.getElementById('trails').checked || b.idx===0) return;
+  const arr=trails.get(b.idx)||[]; if(arr.length<2)return;
+  ctx.save();ctx.beginPath();let first=true;
+  for(const p of arr){const v=displayPosition(p),q=project(v.x,v.y,v.z);if(first){ctx.moveTo(q.x,q.y);first=false}else ctx.lineTo(q.x,q.y)}
+  ctx.strokeStyle=b.color;ctx.globalAlpha=.24;ctx.lineWidth=1.1*devicePixelRatio;ctx.stroke();ctx.restore();
+}
+function drawBody(b,p){
+  const scale=devicePixelRatio, r=Math.max(3,b.vr)*scale;
+  ctx.save();ctx.translate(p.x,p.y);
+
+  // Minimal, single-colour planet style. No textures or fake surface detail.
+  if(b.idx===0){
+    ctx.globalAlpha=.18;ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(0,0,r*1.65,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=.08;ctx.beginPath();ctx.arc(0,0,r*2.15,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;ctx.fillStyle=b.color;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=.8*scale;ctx.stroke();
+
+  if(b.idx===selected){
+    ctx.strokeStyle='rgba(255,255,255,.88)';ctx.lineWidth=1.2*scale;
+    ctx.beginPath();ctx.arc(0,0,r+4*scale,0,Math.PI*2);ctx.stroke();
+  }
+  if(document.getElementById('labels').checked){
+    ctx.globalAlpha=.86;ctx.fillStyle='#e8efff';ctx.font=`${11*scale}px system-ui`;
+    ctx.textAlign='center';ctx.fillText(b.name,0,r+14*scale);
+  }
+  ctx.restore();
+}
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);drawStars();projected=[];
+  const arr=[...bodies].sort((a,b)=>sunRelative(a).y-sunRelative(b).y);
+  for(const b of arr) drawOsculatingOrbit(b);
+  for(const b of arr) drawTrail(b);
+  const ps=[];
+  for(const b of arr){const r=displayPosition(sunRelative(b)),p=project(r.x,r.y,r.z);ps.push({b,p});}
+  ps.sort((a,b)=>a.p.d-b.p.d);
+  for(const o of ps){drawBody(o.b,o.p);projected.push(o);}
+}
+function recordTrails(){
+  if(frame%3!==0)return; const sun=bodies.find(b=>b.idx===0);
+  for(const b of bodies){const arr=trails.get(b.idx);if(!arr)continue;const r=sun?{x:b.x-sun.x,y:b.y-sun.y,z:b.z-sun.z}:{x:b.x,y:b.y,z:b.z};arr.push(r);if(arr.length>750)arr.shift();}
+}
+function recordEccentricities(){
+  if(!running || simTime-lastEccRecordTime<0.01) return;
+  lastEccRecordTime=simTime;
+  for(const b of bodies){
+    if(b.idx===0) continue;
+    const el=osculatingElements(b); if(!el || !isFinite(el.e)) continue;
+    let arr=eccHistory.get(b.idx); if(!arr){arr=[];eccHistory.set(b.idx,arr)}
+    arr.push({t:simTime,e:el.e}); if(arr.length>500) arr.shift();
+  }
+}
+function resizeEccChart(){
+  const r=eccCanvas.getBoundingClientRect();
+  const w=Math.max(1,Math.floor(r.width*devicePixelRatio)),h=Math.max(1,Math.floor(r.height*devicePixelRatio));
+  if(eccCanvas.width!==w||eccCanvas.height!==h){eccCanvas.width=w;eccCanvas.height=h;}
+}
+function drawEccChart(){
+  resizeEccChart(); const w=eccCanvas.width,h=eccCanvas.height;
+  eccCtx.clearRect(0,0,w,h);
+  eccCtx.save();
+  eccCtx.strokeStyle='rgba(255,255,255,.08)';eccCtx.lineWidth=1*devicePixelRatio;
+  for(let i=1;i<4;i++){const y=h*i/4;eccCtx.beginPath();eccCtx.moveTo(0,y);eccCtx.lineTo(w,y);eccCtx.stroke();}
+  if(selected===0){eccCtx.restore();return;}
+  const arr=eccHistory.get(selected)||[]; if(arr.length<1){eccCtx.restore();return;}
+  let minE=Math.min(...arr.map(p=>p.e)),maxE=Math.max(...arr.map(p=>p.e));
+  const base=initialEcc.get(selected); if(isFinite(base)){minE=Math.min(minE,base);maxE=Math.max(maxE,base)}
+  let span=maxE-minE; if(span<1e-4){span=Math.max(.002,Math.abs(maxE)*.08);minE-=span/2;maxE+=span/2}else{const pad=span*.18;minE=Math.max(0,minE-pad);maxE+=pad;}
+  const t0=arr[0].t,t1=Math.max(arr[arr.length-1].t,t0+1e-6);
+  if(isFinite(base)){
+    const y=h-(base-minE)/(maxE-minE)*h;
+    eccCtx.strokeStyle='rgba(255,255,255,.18)';eccCtx.setLineDash([3*devicePixelRatio,4*devicePixelRatio]);eccCtx.beginPath();eccCtx.moveTo(0,y);eccCtx.lineTo(w,y);eccCtx.stroke();eccCtx.setLineDash([]);
+  }
+  eccCtx.beginPath();
+  arr.forEach((p,i)=>{const x=(p.t-t0)/(t1-t0)*w,y=h-(p.e-minE)/(maxE-minE)*h;if(i===0)eccCtx.moveTo(x,y);else eccCtx.lineTo(x,y)});
+  eccCtx.strokeStyle='rgba(255,255,255,.78)';eccCtx.lineWidth=1.4*devicePixelRatio;eccCtx.stroke();
+  eccCtx.fillStyle='rgba(220,230,250,.62)';eccCtx.font=`${9*devicePixelRatio}px system-ui`;eccCtx.textAlign='left';
+  eccCtx.fillText(maxE.toFixed(4),4*devicePixelRatio,10*devicePixelRatio);eccCtx.fillText(minE.toFixed(4),4*devicePixelRatio,h-4*devicePixelRatio);
+  eccCtx.restore();
+}
+function updateUI(force=false){
+  if(!force && frame%8!==0)return;
+  document.getElementById('timeHud').textContent=simTime.toFixed(simTime<10?2:1)+' 年';
+  const E=totalEnergy();const drift=initialEnergy?100*Math.abs((E-initialEnergy)/initialEnergy):0;
+  document.getElementById('energyHud').textContent=drift.toFixed(drift<.1?4:2)+'%';
+  const d=diagnostics();const sh=document.getElementById('stabilityHud');sh.textContent=d.status;sh.className=d.cls;
+  document.getElementById('minSep').textContent=isFinite(d.min)?d.min.toFixed(d.min<1?3:2)+' AU':'—';
+  document.getElementById('fastest').textContent=d.fast.name==='—'?'—':d.fast.name+' '+(d.fast.s*4.74047).toFixed(1)+' km/s';
+  document.getElementById('activeCount').textContent=bodies.length;
+  document.getElementById('eventCount').textContent=eventCount;
+  const sb=bodies.find(b=>b.idx===selected), el=sb?osculatingElements(sb):null, e0=initialEcc.get(selected);
+  document.getElementById('eccPlanetName').textContent=raw[selected]?.name||'—';
+  document.getElementById('eccNow').textContent=el&&isFinite(el.e)?el.e.toFixed(5):'—';
+  document.getElementById('eccDelta').textContent=el&&isFinite(el.e)&&isFinite(e0)?((el.e-e0)>=0?'+':'')+(el.e-e0).toFixed(5):'—';
+  drawEccChart();
+}
+function animate(){
+  frame++;
+  if(running && bodies.length>1){
+    const daysPerFrame=Number(document.getElementById('speed').value), dtDays=Number(document.getElementById('dt').value);
+    const steps=Math.max(1,Math.ceil(daysPerFrame/dtDays)), dt=daysPerFrame/steps*DAY;
+    for(let k=0;k<steps;k++)step(dt);
+    recordTrails();
+    recordEccentricities();
+  }
+  updateUI();draw();requestAnimationFrame(animate);
+}
+function resize(){
+  const r=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.floor(r.width*devicePixelRatio));canvas.height=Math.max(1,Math.floor(r.height*devicePixelRatio));
+  stars=Array.from({length:Math.floor((r.width*r.height)/8500)},()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,s:(Math.random()*1.3+.3)*devicePixelRatio,a:Math.random()*.55+.16}));
+}
+
+function makeControls(){
+  const list=document.getElementById('planetList'),sel=document.getElementById('planetSelect');list.innerHTML='';sel.innerHTML='';
+  raw.forEach((p,i)=>{
+    const lab=document.createElement('label');lab.className='toggle';lab.innerHTML=`<input type="checkbox" data-index="${i}" ${config[i].enabled?'checked':''}><span class="dot" style="color:${p.color};background:${p.color}"></span><span>${p.name}</span>`;list.appendChild(lab);
+    const opt=document.createElement('option');opt.value=i;opt.textContent=p.name;sel.appendChild(opt);
+  });
+  sel.value=selected;
+  list.addEventListener('change',e=>{if(e.target.matches('input[type=checkbox]')){const i=+e.target.dataset.index;config[i].enabled=e.target.checked;if(i===0 && !e.target.checked && bodies.length===1) config[i].enabled=true;buildSystem();}});
+  sel.addEventListener('change',()=>{selected=+sel.value;syncPlanetSliders();});
+}
+function syncPlanetSliders(){
+  const c=config[selected];document.getElementById('massScale').value=c.massScale;document.getElementById('velScale').value=c.velScale;document.getElementById('distScale').value=c.distScale;updateLabels();
+}
+function updateLabels(){
+  document.getElementById('massVal').textContent=Number(document.getElementById('massScale').value).toFixed(2)+'×';
+  document.getElementById('velVal').textContent=Number(document.getElementById('velScale').value).toFixed(3)+'×';
+  document.getElementById('distVal').textContent=Number(document.getElementById('distScale').value).toFixed(3)+'×';
+  const sp=Number(document.getElementById('speed').value);document.getElementById('speedVal').textContent=(sp<1?sp.toFixed(2):sp.toFixed(1))+' 日/畫面';
+  document.getElementById('dtVal').textContent=Number(document.getElementById('dt').value).toFixed(2)+' 日';
+  document.getElementById('gVal').textContent=Number(document.getElementById('gScale').value).toFixed(3)+'×';
+  document.getElementById('zoomVal').textContent=document.getElementById('zoom').value+'×';
+  document.getElementById('spacingVal').textContent=Number(document.getElementById('spacing').value).toFixed(2);
+  document.getElementById('tiltVal').textContent=document.getElementById('tilt').value+'°';
+}
+function resetConfig(){config.forEach(c=>{c.enabled=true;c.massScale=1;c.velScale=1;c.distScale=1});document.getElementById('gScale').value=1;document.getElementById('grCorrection').checked=true;document.getElementById('dt').value=.05;document.getElementById('speed').value=.25;document.getElementById('zoom').value=58;document.getElementById('spacing').value=.55;camera.zoom=58;camera.spacing=.55;makeControls();syncPlanetSliders();buildSystem();}
+function applyPreset(name){
+  resetConfig();
+  if(name==='jupiter10')config[5].massScale=10;
+  if(name==='jupiter30')config[5].massScale=30;
+  if(name==='earthKick')config[3].velScale=1.10;
+  makeControls();syncPlanetSliders();buildSystem();
+}
+
+// UI bindings
+makeControls();syncPlanetSliders();buildSystem();resize();
+window.addEventListener('resize',resize);
+document.getElementById('playBtn').addEventListener('click',()=>{running=!running;document.getElementById('playBtn').textContent=running?'❚❚ 暫停':'▶ 播放'});
+document.getElementById('resetBtn').addEventListener('click',()=>buildSystem());
+document.getElementById('restoreAll').addEventListener('click',()=>{config.forEach(c=>c.enabled=true);makeControls();buildSystem()});
+document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.preset)));
+document.getElementById('chaosBtn').addEventListener('click',()=>{resetConfig();running=true;document.getElementById('playBtn').textContent='❚❚ 暫停';});
+document.getElementById('applyPlanet').addEventListener('click',()=>{const c=config[selected];c.massScale=+document.getElementById('massScale').value;c.velScale=+document.getElementById('velScale').value;c.distScale=+document.getElementById('distScale').value;buildSystem();});
+document.querySelectorAll('[data-reset1]').forEach(btn=>btn.addEventListener('click',()=>{
+  const id=btn.dataset.reset1;
+  const el=document.getElementById(id); if(!el) return;
+  el.value=1;
+  if(id==='massScale') config[selected].massScale=1;
+  if(id==='velScale') config[selected].velScale=1;
+  if(id==='distScale') config[selected].distScale=1;
+  updateLabels();
+  buildSystem();
+}));
+document.getElementById('grCorrection').addEventListener('change',()=>buildSystem());
+['massScale','velScale','distScale','speed','dt','gScale','zoom','spacing','tilt'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{if(id==='zoom')camera.zoom=+document.getElementById('zoom').value;if(id==='spacing')camera.spacing=+document.getElementById('spacing').value;if(id==='tilt')camera.tilt=deg(+document.getElementById('tilt').value);updateLabels();if(id==='gScale'){initialEnergy=totalEnergy();}}));
+document.getElementById('gScale').addEventListener('change',()=>buildSystem());
+
+document.addEventListener('keydown',e=>{if(e.code==='Space' && !/INPUT|SELECT|BUTTON/.test(document.activeElement.tagName)){e.preventDefault();running=!running;document.getElementById('playBtn').textContent=running?'❚❚ 暫停':'▶ 播放'}});
+canvas.addEventListener('pointerdown',e=>{drag={on:true,x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!drag.on)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;camera.rot+=dx*.006;camera.tilt=Math.max(0,Math.min(deg(80),camera.tilt+dy*.004));drag.x=e.clientX;drag.y=e.clientY;document.getElementById('tilt').value=Math.round(camera.tilt*180/Math.PI);updateLabels();});
+canvas.addEventListener('pointerup',e=>{drag.on=false;try{canvas.releasePointerCapture(e.pointerId)}catch(_){}});
+canvas.addEventListener('wheel',e=>{e.preventDefault();camera.zoom=Math.max(25,Math.min(110,camera.zoom*Math.exp(-e.deltaY*.001)));document.getElementById('zoom').value=Math.round(camera.zoom);updateLabels()},{passive:false});
+canvas.addEventListener('click',e=>{
+  const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*devicePixelRatio,y=(e.clientY-r.top)*devicePixelRatio;
+  let hit=null,best=Infinity;for(const o of projected){const d=Math.hypot(o.p.x-x,o.p.y-y),rr=(o.b.vr+8)*devicePixelRatio;if(d<rr&&d<best){best=d;hit=o.b}}
+  if(hit){selected=hit.idx;document.getElementById('planetSelect').value=selected;syncPlanetSliders();}
+});
+canvas.addEventListener('mousemove',e=>{
+  if(drag.on)return;const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*devicePixelRatio,y=(e.clientY-rect.top)*devicePixelRatio;let hit=null,best=Infinity;
+  for(const o of projected){const d=Math.hypot(o.p.x-x,o.p.y-y),rr=(o.b.vr+7)*devicePixelRatio;if(d<rr&&d<best){best=d;hit=o.b}}
+  const tip=document.getElementById('tooltip');
+  if(hit){const sun=bodies.find(b=>b.idx===0),d=sun&&hit.idx!==0?Math.hypot(hit.x-sun.x,hit.y-sun.y,hit.z-sun.z):0,v=Math.hypot(hit.vx,hit.vy,hit.vz)*4.74047;tip.style.display='block';tip.style.left=(e.clientX-rect.left+12)+'px';tip.style.top=(e.clientY-rect.top+12)+'px';const oe=hit.idx===0?null:osculatingElements(hit);tip.innerHTML=`<b>${hit.name}</b><br>${hit.idx===0?'中心恆星':'距太陽 '+d.toFixed(3)+' AU'}<br>速度 ${v.toFixed(2)} km/s${oe?'<br>瞬時離心率 e '+oe.e.toFixed(5):''}<br>質量倍率 ${config[hit.idx].massScale.toFixed(2)}×`;} else tip.style.display='none';
+});
+canvas.addEventListener('mouseleave',()=>document.getElementById('tooltip').style.display='none');
+updateLabels();
+requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
